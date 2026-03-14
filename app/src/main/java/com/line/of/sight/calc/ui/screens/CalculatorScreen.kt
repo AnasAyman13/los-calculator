@@ -60,14 +60,18 @@ fun CalculatorScreen(viewModel: CalculatorViewModel = viewModel()) {
     val uiState by viewModel.uiState.collectAsState()
     var resultsVisible by remember { mutableStateOf(false) }
 
-    LaunchedEffect(uiState.totalString) {
-        resultsVisible = false
-        resultsVisible = true
+    // ✅ FIX: Only show results when calculationVersion changes (i.e. user pressed Calculate)
+    // NOT on every totalString change (which fires while typing)
+    LaunchedEffect(uiState.calculationVersion) {
+        if (uiState.calculationVersion > 0) {
+            resultsVisible = false
+            resultsVisible = true
+        }
     }
 
     Surface(
         modifier = Modifier.fillMaxSize(),
-        color = Color(0xFFF9FAFB) // Very light gray background
+        color = Color(0xFFF9FAFB)
     ) {
         Column(
             modifier = Modifier
@@ -75,17 +79,14 @@ fun CalculatorScreen(viewModel: CalculatorViewModel = viewModel()) {
                 .verticalScroll(rememberScrollState())
                 .statusBarsPadding()
         ) {
-            // ── COMPACT HEADER ──────────────────────────────────────────
             CompactHeader()
 
             Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 24.dp)) {
 
-                // ── INFO SECTION ───────────────────────────────────────────
                 InfoSectionCard()
 
                 Spacer(modifier = Modifier.height(20.dp))
 
-                // ── INPUT SECTION ──────────────────────────────────────────
                 InputSectionCard(
                     h1 = uiState.h1Input,
                     h2 = uiState.h2Input,
@@ -101,7 +102,6 @@ fun CalculatorScreen(viewModel: CalculatorViewModel = viewModel()) {
 
                 Spacer(modifier = Modifier.height(28.dp))
 
-                // ── RESULTS & VISUALIZATION ─────────────────────────────────
                 AnimatedVisibility(
                     visible = resultsVisible,
                     enter = fadeIn(tween(400)) + slideInVertically(
@@ -124,15 +124,13 @@ fun CalculatorScreen(viewModel: CalculatorViewModel = viewModel()) {
                             value = uiState.d2String,
                             accent = Teal
                         )
-                        
+
                         TotalResultCard(value = uiState.totalString)
 
                         Spacer(modifier = Modifier.height(12.dp))
 
                         SectionDivider("LOS Visualization")
-                        
-                        // Technical Diagram
-                        val distKm = uiState.totalString.split(" ").firstOrNull()?.toDoubleOrNull() ?: 0.0
+
                         LOSDiagram(
                             h1 = uiState.h1Input.toDoubleOrNull() ?: 0.0,
                             h2 = uiState.h2Input.toDoubleOrNull() ?: 0.0,
@@ -141,7 +139,7 @@ fun CalculatorScreen(viewModel: CalculatorViewModel = viewModel()) {
                         )
                     }
                 }
-                
+
                 Spacer(modifier = Modifier.height(48.dp))
             }
         }
@@ -228,7 +226,7 @@ private fun InputSectionCard(
         elevation = CardDefaults.cardElevation(2.dp)
     ) {
         Column(modifier = Modifier.padding(24.dp)) {
-            
+
             Text(
                 "Antenna Heights",
                 style = MaterialTheme.typography.titleMedium,
@@ -269,7 +267,6 @@ private fun InputSectionCard(
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // Unit Toggle Section
             Text(
                 "Height Units",
                 style = MaterialTheme.typography.labelLarge,
@@ -281,32 +278,70 @@ private fun InputSectionCard(
 
             Spacer(modifier = Modifier.height(32.dp))
 
-            // Action Buttons
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            // ✅ FIX: Both buttons use weight() so Compose divides the row fairly.
+            // weight(1.6f) + weight(1f) = Calculate gets ~61%, Clear gets ~39%
+            // Clear always has enough space to show the full word "Clear"
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Calculate — primary action, slightly wider
                 Button(
                     onClick = onCalculate,
                     modifier = Modifier
-                        .weight(2f)
-                        .height(54.dp),
+                        .weight(1.6f)           // ← was weight(2f), same idea but Clear gets more room
+                        .height(52.dp),
                     shape = RoundedCornerShape(16.dp),
+                    contentPadding = PaddingValues(horizontal = 20.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = Indigo)
                 ) {
-                    Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Icon(
+                        Icons.Default.Refresh,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("Calculate", fontWeight = FontWeight.Bold, fontSize = 16.sp, maxLines = 1)
+                    Text(
+                        "Calculate",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 15.sp,
+                        maxLines = 1,
+                        softWrap = false         // ← never wraps to second line
+                    )
                 }
 
+                // Clear — secondary action
+                // weight(1f) guarantees a proportional share of the row width.
+                // contentPadding gives the text breathing room inside the button.
+                // softWrap = false means it will never try to wrap "Clear".
                 Button(
                     onClick = onClear,
                     modifier = Modifier
-                        .weight(1f)
-                        .height(54.dp),
+                        .weight(1f)              // ← was weight(1f) but with weight(2f) on sibling
+                        .height(52.dp),          //   that left only 33% — now Clear gets ~39%
                     shape = RoundedCornerShape(16.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFF3F4F6))
+                    contentPadding = PaddingValues(horizontal = 16.dp), // ← explicit padding
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFFF3F4F6),
+                        contentColor = Color.Gray
+                    )
                 ) {
-                    Icon(Icons.Default.Delete, contentDescription = null, tint = Color.Gray, modifier = Modifier.size(18.dp))
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("Clear", color = Color.Gray, fontWeight = FontWeight.Bold, maxLines = 1)
+                    Icon(
+                        Icons.Default.Delete,
+                        contentDescription = null,
+                        tint = Color.Gray,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        "Clear",
+                        color = Color.Gray,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 15.sp,
+                        maxLines = 1,
+                        softWrap = false         // ← never wraps or clips
+                    )
                 }
             }
         }
@@ -401,7 +436,6 @@ private fun TotalResultCard(value: String) {
 
 @Composable
 fun LOSDiagram(h1: Double, h2: Double, distanceStr: String, unitLabel: String) {
-    // Normalize values for illustration
     val maxH = max(100.0, max(h1, h2))
     val normH1 = (h1 / maxH).toFloat().coerceIn(0.1f, 1f)
     val normH2 = (h2 / maxH).toFloat().coerceIn(0.1f, 1f)
@@ -411,38 +445,37 @@ fun LOSDiagram(h1: Double, h2: Double, distanceStr: String, unitLabel: String) {
     val textMeasurer = rememberTextMeasurer()
 
     Card(
-        modifier = Modifier.fillMaxWidth().height(180.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(180.dp),
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),
         border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFF3F4F6))
     ) {
-        Canvas(modifier = Modifier.fillMaxSize().padding(24.dp)) {
+        Canvas(modifier = Modifier
+            .fillMaxSize()
+            .padding(24.dp)) {
             val w = size.width
             val h = size.height
             val groundY = h * 0.8f
             val maxAntHeight = h * 0.5f
 
-            // Earth Curvature (Subtle Arc)
             val earthPath = Path().apply {
                 moveTo(0f, groundY + 10f)
                 quadraticTo(w / 2, groundY - 20f, w, groundY + 10f)
             }
             drawPath(earthPath, Color(0xFFE5E7EB), style = Stroke(width = 4f, cap = StrokeCap.Round))
 
-            // Antenna 1 (Left)
             val ant1X = w * 0.15f
             val ant1TopY = groundY - (maxAntHeight * animH1)
             drawLine(Indigo, Offset(ant1X, groundY), Offset(ant1X, ant1TopY), strokeWidth = 6f, cap = StrokeCap.Round)
-            // Signal Rings
             drawCircle(Indigo.copy(alpha = 0.2f), 12f, Offset(ant1X, ant1TopY))
 
-            // Antenna 2 (Right)
             val ant2X = w * 0.85f
             val ant2TopY = groundY - (maxAntHeight * animH2)
             drawLine(Teal, Offset(ant2X, groundY), Offset(ant2X, ant2TopY), strokeWidth = 6f, cap = StrokeCap.Round)
             drawCircle(Teal.copy(alpha = 0.2f), 12f, Offset(ant2X, ant2TopY))
 
-            // LOS Path (Dashed Arc)
             val midX = (ant1X + ant2X) / 2
             val midY = min(ant1TopY, ant2TopY) - 15f
             val losPath = Path().apply {
@@ -451,42 +484,26 @@ fun LOSDiagram(h1: Double, h2: Double, distanceStr: String, unitLabel: String) {
             }
             drawPath(
                 losPath,
-                Color(0xFFF59E0B), // Amber color for signal
-                style = Stroke(
-                    width = 3f,
-                    pathEffect = PathEffect.dashPathEffect(floatArrayOf(10f, 10f), 0f)
-                )
+                Color(0xFFF59E0B),
+                style = Stroke(width = 3f, pathEffect = PathEffect.dashPathEffect(floatArrayOf(10f, 10f), 0f))
             )
 
-            // Labels
             val styleMedium = TextStyle(fontSize = 11.sp, color = Color.Gray, fontWeight = FontWeight.SemiBold)
-            val styleSmall = TextStyle(fontSize = 10.sp, color = Color.Gray, fontWeight = FontWeight.Normal)
+            val styleSmall  = TextStyle(fontSize = 10.sp, color = Color.Gray, fontWeight = FontWeight.Normal)
 
-            // Diagram distance text
             val distLayout = textMeasurer.measure(distanceStr, style = styleMedium)
-            drawText(
-                textLayoutResult = distLayout,
-                topLeft = Offset(midX - (distLayout.size.width / 2f), midY - 20f)
-            )
+            drawText(textLayoutResult = distLayout, topLeft = Offset(midX - distLayout.size.width / 2f, midY - 20f))
 
-            // Antenna 1 Label
             if (h1 > 0) {
                 val h1Str = "${h1.toInt()}$unitLabel"
                 val h1Layout = textMeasurer.measure(h1Str, style = styleSmall)
-                drawText(
-                    textLayoutResult = h1Layout,
-                    topLeft = Offset(ant1X - h1Layout.size.width - 12f, ant1TopY + 10f)
-                )
+                drawText(textLayoutResult = h1Layout, topLeft = Offset(ant1X - h1Layout.size.width - 12f, ant1TopY + 10f))
             }
 
-            // Antenna 2 Label
             if (h2 > 0) {
                 val h2Str = "${h2.toInt()}$unitLabel"
                 val h2Layout = textMeasurer.measure(h2Str, style = styleSmall)
-                drawText(
-                    textLayoutResult = h2Layout,
-                    topLeft = Offset(ant2X + 12f, ant2TopY + 10f)
-                )
+                drawText(textLayoutResult = h2Layout, topLeft = Offset(ant2X + 12f, ant2TopY + 10f))
             }
         }
     }
