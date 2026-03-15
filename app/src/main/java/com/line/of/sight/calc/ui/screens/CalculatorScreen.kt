@@ -60,7 +60,7 @@ fun CalculatorScreen(viewModel: CalculatorViewModel = viewModel()) {
     val uiState by viewModel.uiState.collectAsState()
     var resultsVisible by remember { mutableStateOf(false) }
 
-    // ✅ FIX: Only show results when calculationVersion changes (i.e. user pressed Calculate)
+    //  FIX: Only show results when calculationVersion changes (i.e. user pressed Calculate)
     // NOT on every totalString change (which fires while typing)
     LaunchedEffect(uiState.calculationVersion) {
         if (uiState.calculationVersion > 0) {
@@ -278,7 +278,7 @@ private fun InputSectionCard(
 
             Spacer(modifier = Modifier.height(32.dp))
 
-            // ✅ FIX: Both buttons use weight() so Compose divides the row fairly.
+            // FIX: Both buttons use weight() so Compose divides the row fairly.
             // weight(1.6f) + weight(1f) = Calculate gets ~61%, Clear gets ~39%
             // Clear always has enough space to show the full word "Clear"
             Row(
