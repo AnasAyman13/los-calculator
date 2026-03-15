@@ -17,8 +17,7 @@ data class UiState(
     val totalString: String = "0 km",
     val unitLabel: String = "km",
     val errorMessage: String? = null,
-    // ✅ FIX: Incremented ONLY when user presses Calculate.
-    // The UI watches this — not totalString — so typing never shows results.
+   
     val calculationVersion: Int = 0
 )
 
@@ -32,7 +31,7 @@ class CalculatorViewModel : ViewModel() {
     private val _uiState = MutableStateFlow(UiState())
     val uiState: StateFlow<UiState> = _uiState
 
-    // ✅ FIX: No autoCalculate() — typing only updates the input fields
+     
     fun onH1Change(s: String) {
         _uiState.update { it.copy(h1Input = s, errorMessage = null) }
     }
@@ -64,7 +63,7 @@ class CalculatorViewModel : ViewModel() {
         // No autoCalculate — user must press Calculate again
     }
 
-    // ✅ The ONLY entry point for calculation
+    //  The ONLY entry point for calculation
     fun calculate() {
         val state = _uiState.value
         if (state.h1Input.isBlank() && state.h2Input.isBlank()) {
@@ -90,7 +89,7 @@ class CalculatorViewModel : ViewModel() {
                 totalString = String.format(Locale.US, "%.2f %s", total, label),
                 unitLabel = label,
                 errorMessage = null,
-                calculationVersion = it.calculationVersion + 1  // ✅ signals UI to reveal results
+                calculationVersion = it.calculationVersion + 1  //  signals UI to reveal results
             )
         }
     }
